@@ -1,0 +1,29 @@
+[package]
+name = "activeledger"
+version = "0.1.1"
+authors = ["Chris Holdt <4070267+Chris-Holdt@users.noreply.github.com>"]
+edition = "2018"
+
+description = "Rust SDK for easy connection to Activeledger networks"
+repository = "https://github.com/activeledger/SDK-Rust"
+homepage = "https://activeledger.io"
+readme = "README.md"
+keywords = ["activeledger", "dlt", "blockchain", "distributed", "ledger"]
+license-file = "LICENSE"
+
+exclude = ["testfiles/**"]
+
+[dependencies]
+serde_json = "1.0.40"
+base64 = "0.10.1"
+url = "2.1.0"
+reqwest = "0.9.20"
+
+openssl = { version = "0.10.24", features = ["vendored"] }
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "key_gen"
+harness = false

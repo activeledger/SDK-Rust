@@ -1,0 +1,8 @@
+{
+	"name" : "EC import test",
+	"type": "ec",
+	"pem" : {
+		"private" : "-----BEGIN PRIVATE KEY-----\nMIGEAgEAMBAGByqGSM49AgEGBSuBBAAKBG0wawIBAQQg7JMifhU5CfU7RtsFIX4G\n0i9gZtyDsRJeIda8SlyHp7OhRANCAATFu9293EFLPAB1suPxpP/utdG/Ho8f4/VM\nK+b8telB3dx7iIzZLIjaRF6OwyOmXWTzf55mEumnFUtcbKfu0O4E\n-----END PRIVATE KEY-----\n",
+		"public" : "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAExbvdvdxBSzwAdbLj8aT/7rXRvx6PH+P1\nTCvm/LXpQd3ce4iM2SyI2kRejsMjpl1k83+eZhLppxVLXGyn7tDuBA==\n-----END PUBLIC KEY-----\n"
+	}
+}
