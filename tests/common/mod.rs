@@ -7,6 +7,7 @@ pub struct Vector {
     pub key_type: String,
     pub public_key_form: String,
     pub deterministic_signature: String,
+    pub high_s_signature: String,
     pub message_name: String,
     pub message: String,
     pub public_key: String,
@@ -34,6 +35,7 @@ fn load() -> &'static Vec<Vector> {
                     .as_str()
                     .unwrap_or("")
                     .to_owned(),
+                high_s_signature: v["highSSignature"].as_str().unwrap_or("").to_owned(),
                 message_name: v["messageName"].as_str().unwrap().to_owned(),
                 message: v["message"].as_str().unwrap().to_owned(),
                 public_key: v["publicKey"].as_str().unwrap().to_owned(),
