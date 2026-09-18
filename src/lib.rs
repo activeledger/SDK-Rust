@@ -51,10 +51,12 @@ pub mod canonical;
 pub mod connection;
 pub mod events;
 pub mod keys;
+pub mod secp256k1;
 pub mod transaction;
 
 pub use canonical::{CanonicalError, Object, Value};
 pub use connection::{Client, ClientError, Identity, Response};
 pub use events::{Event, EventParser};
 pub use keys::{KeyError, KeyPair, KeyType, Signer};
+pub use secp256k1::Secp256k1KeyPair;
 pub use transaction::{Transaction, TransactionBuilder, TransactionError};

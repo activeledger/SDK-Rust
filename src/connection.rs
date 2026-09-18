@@ -112,7 +112,7 @@ impl Response {
 #[derive(Debug, Clone)]
 pub struct Identity {
     pub stream_id: String,
-    pub public_key_base64: String,
+    pub public_key: String,
 }
 
 /// A connection to one Activeledger node.
@@ -187,7 +187,7 @@ impl Client {
         match response.new_streams().into_iter().next() {
             Some(stream_id) => Ok(Identity {
                 stream_id,
-                public_key_base64: signer.public_key_base64(),
+                public_key: signer.public_key(),
             }),
             None => Err(ClientError::OnboardFailed(response.raw)),
         }

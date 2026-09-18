@@ -39,6 +39,11 @@ impl KeyType {
             "secp256k1" => Ok(KeyType::Secp256k1),
             "ml-dsa-65" => Ok(KeyType::MlDsa65),
             "falcon-512" => Ok(KeyType::Falcon512),
+
+            // The ledger routes these to identical secp256k1 verification, so
+            // an existing identity may already carry either. Accepted here and
+            // NEVER emitted: as_wire always returns "secp256k1".
+            "bitcoin" | "ethereum" => Ok(KeyType::Secp256k1),
             other => Err(KeyError::UnknownKeyType(other.to_owned())),
         }
     }
@@ -78,6 +83,26 @@ pub enum KeyError {
     #[error("this key pair has no private key - it was created for verification only")]
     VerifyOnly,
 
+    #[error(
+        "secp256k1 {role} key must start with '0x' - that prefix is part of what the ledger \
+         stores, not decoration. Post-quantum keys are base64; these are not."
+    )]
+    MissingHexPrefix { role: &'static str },
+
+    #[error("secp256k1 {role} key is not valid hex")]
+    NotHex { role: &'static str },
+
+    #[error(
+        "secp256k1 public key is {actual} bytes, expected 33 (compressed) or 65 (uncompressed)"
+    )]
+    WrongPublicKeyLength { actual: usize },
+
+    #[error(
+        "secp256k1 public key starts with {prefix:#04x}, which does not match its length of \
+         {length} bytes (expected 0x02/0x03 for 33, 0x04 for 65)"
+    )]
+    PointPrefixMismatch { prefix: u8, length: usize },
+
     #[error("signing failed")]
     SigningFailed,
 
@@ -103,7 +128,7 @@ pub enum KeyError {
 /// SDK needing to know about it.
 pub trait Signer {
     fn key_type(&self) -> KeyType;
-    fn public_key_base64(&self) -> String;
+    fn public_key(&self) -> String;
     fn sign(&self, message: &[u8]) -> Result<Vec<u8>, KeyError>;
 }
 
@@ -166,12 +191,17 @@ impl KeyPair {
         Ok(pair)
     }
 
-    pub fn public_key_base64(&self) -> String {
+    /// The public key, base64, exactly as the ledger stores it.
+    ///
+    /// Named without an encoding because [`Signer::public_key`] is: the
+    /// post-quantum schemes are base64 and secp256k1 is hex, and the trait
+    /// has to cover both.
+    pub fn public_key(&self) -> String {
         STANDARD.encode(&self.public_bytes)
     }
 
     /// The private key, base64. `None` when this pair can only verify.
-    pub fn private_key_base64(&self) -> Option<String> {
+    pub fn private_key(&self) -> Option<String> {
         self.private_bytes.as_ref().map(|b| STANDARD.encode(b))
     }
 
@@ -197,8 +227,8 @@ impl Signer for KeyPair {
         KeyType::MlDsa65
     }
 
-    fn public_key_base64(&self) -> String {
-        KeyPair::public_key_base64(self)
+    fn public_key(&self) -> String {
+        KeyPair::public_key(self)
     }
 
     /// Signs a message, returning the raw signature.
