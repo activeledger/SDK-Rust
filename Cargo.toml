@@ -1,29 +1,34 @@
 [package]
 name = "activeledger"
-version = "0.1.1"
-authors = ["Chris Holdt <4070267+Chris-Holdt@users.noreply.github.com>"]
-edition = "2018"
+version = "2.0.0"
+edition = "2021"
+# Verified by building on it, not guessed. The floor comes from the
+# dependency graph rather than from this crate's own code: reqwest pulls in
+# the icu crates, which require 1.88.
+rust-version = "1.88"
 
-description = "Rust SDK for easy connection to Activeledger networks"
+description = "Rust SDK for Activeledger, with post-quantum identity support (ML-DSA-65)"
 repository = "https://github.com/activeledger/SDK-Rust"
 homepage = "https://activeledger.io"
 readme = "README.md"
 keywords = ["activeledger", "dlt", "blockchain", "distributed", "ledger"]
-license-file = "LICENSE"
-
-exclude = ["testfiles/**"]
+categories = ["cryptography", "api-bindings"]
+license = "MIT"
 
 [dependencies]
-serde_json = "1.0.40"
-base64 = "0.10.1"
-url = "2.1.0"
-reqwest = "0.9.20"
+# FIPS 204 ML-DSA. Pure Rust, no C toolchain, and verified against the
+# ledger's published vectors: it decodes the exact 1952/4032 encodings the
+# ledger stores, with no wrapping or re-encoding step.
+fips204 = "0.4"
+base64 = "0.22"
+serde_json = "1"
+thiserror = "2"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+async-stream = "0.3"
 
-openssl = { version = "0.10.24", features = ["vendored"] }
+# rustls rather than native-tls: the previous release vendored and compiled
+# OpenSSL, which made this crate need a C toolchain to build at all.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 
 [dev-dependencies]
-criterion = "0.3"
-
-[[bench]]
-name = "key_gen"
-harness = false
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
