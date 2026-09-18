@@ -48,23 +48,37 @@ fn verifies_every_published_signature() {
 /// would make it look like an intermittent fault rather than a crypto one.
 #[test]
 fn high_s_signatures_from_elsewhere_still_verify() {
-    let high: Vec<_> = common::secp256k1()
-        .filter(|v| secp256k1::is_high_s_base64(&v.signature))
-        .collect();
+    for v in common::secp256k1() {
+        // The fixture must be what it claims. A "high-S" signature that is not
+        // high-S would pass a permissive verifier for the wrong reason: green,
+        // and proving nothing.
+        assert!(
+            secp256k1::is_high_s_base64(&v.high_s_signature),
+            "{}/{}: the published high-S fixture is not high-S",
+            v.message_name,
+            v.public_key_form
+        );
 
-    assert!(
-        !high.is_empty(),
-        "the published vectors no longer contain a high-S signature, so this test proves nothing"
-    );
-
-    for v in high {
         let key = Secp256k1KeyPair::from_public(&v.public_key).unwrap();
         assert!(
-            key.verify(v.message.as_bytes(), &decode(&v.signature)),
+            key.verify(v.message.as_bytes(), &decode(&v.high_s_signature)),
             "rejected a high-S signature ({}/{}) - low-S is being enforced on verify",
             v.message_name,
             v.public_key_form
         );
+    }
+}
+
+/// Permissive about s only. Accepting high-S must not have quietly widened
+/// anything else.
+#[test]
+fn the_high_s_form_still_rejects_a_tampered_message() {
+    for v in common::secp256k1() {
+        let key = Secp256k1KeyPair::from_public(&v.public_key).unwrap();
+        let mut tampered = v.message.clone().into_bytes();
+        tampered.push(b' ');
+
+        assert!(!key.verify(&tampered, &decode(&v.high_s_signature)));
     }
 }
 
