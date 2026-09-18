@@ -5,6 +5,8 @@ use std::sync::OnceLock;
 #[allow(dead_code)]
 pub struct Vector {
     pub key_type: String,
+    pub public_key_form: String,
+    pub deterministic_signature: String,
     pub message_name: String,
     pub message: String,
     pub public_key: String,
@@ -27,6 +29,11 @@ fn load() -> &'static Vec<Vector> {
             .iter()
             .map(|v| Vector {
                 key_type: v["type"].as_str().unwrap().to_owned(),
+                public_key_form: v["publicKeyForm"].as_str().unwrap_or("").to_owned(),
+                deterministic_signature: v["deterministicSignature"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_owned(),
                 message_name: v["messageName"].as_str().unwrap().to_owned(),
                 message: v["message"].as_str().unwrap().to_owned(),
                 public_key: v["publicKey"].as_str().unwrap().to_owned(),
@@ -40,6 +47,12 @@ fn load() -> &'static Vec<Vector> {
 #[allow(dead_code)]
 pub fn all() -> &'static [Vector] {
     load()
+}
+
+/// Only the secp256k1 vectors.
+#[allow(dead_code)]
+pub fn secp256k1() -> impl Iterator<Item = &'static Vector> {
+    load().iter().filter(|v| v.key_type == "secp256k1")
 }
 
 /// Only the ML-DSA-65 vectors. Falcon is deliberately unsupported here.

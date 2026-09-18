@@ -87,7 +87,7 @@ impl Transaction {
                     label,
                     Object::new()
                         .set("type", signer.key_type().as_wire())
-                        .set("publicKey", signer.public_key_base64()),
+                        .set("publicKey", signer.public_key()),
                 ),
             )
             .set("$o", Object::new());

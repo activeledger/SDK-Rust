@@ -53,8 +53,8 @@ fn verifies_every_published_signature() {
 fn round_trips_published_keys_without_re_deriving() {
     for v in common::ml_dsa() {
         let key = KeyPair::from_keys(&v.public_key, &v.private_key).expect("key pair");
-        assert_eq!(v.public_key, key.public_key_base64());
-        assert_eq!(Some(v.private_key.clone()), key.private_key_base64());
+        assert_eq!(v.public_key, key.public_key());
+        assert_eq!(Some(v.private_key.clone()), key.private_key());
     }
 }
 
@@ -141,13 +141,10 @@ fn a_falcon_signature_does_not_verify_as_ml_dsa() {
 #[test]
 fn generated_keys_have_the_documented_lengths() {
     let key = KeyPair::generate().expect("generate");
-    assert_eq!(
-        ML_DSA_65_PUBLIC_KEY_SIZE,
-        decode(&key.public_key_base64()).len()
-    );
+    assert_eq!(ML_DSA_65_PUBLIC_KEY_SIZE, decode(&key.public_key()).len());
     assert_eq!(
         ML_DSA_65_PRIVATE_KEY_SIZE,
-        decode(&key.private_key_base64().unwrap()).len()
+        decode(&key.private_key().unwrap()).len()
     );
 }
 
@@ -164,7 +161,7 @@ fn verify_only_key_pair_refuses_to_sign() {
     let key = KeyPair::from_public(&v.public_key).unwrap();
 
     assert!(!key.can_sign());
-    assert!(key.private_key_base64().is_none());
+    assert!(key.private_key().is_none());
     assert!(matches!(key.sign(b"anything"), Err(KeyError::VerifyOnly)));
 }
 
@@ -232,7 +229,7 @@ fn debug_output_does_not_leak_the_private_key() {
     let key = KeyPair::generate().unwrap();
     let rendered = format!("{key:?}");
 
-    assert!(!rendered.contains(&key.private_key_base64().unwrap()));
-    assert!(!rendered.contains(&key.public_key_base64()));
+    assert!(!rendered.contains(&key.private_key().unwrap()));
+    assert!(!rendered.contains(&key.public_key()));
     assert_eq!("KeyPair(ml-dsa-65, public+private)", rendered);
 }

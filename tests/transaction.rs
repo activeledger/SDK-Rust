@@ -28,7 +28,7 @@ fn onboard_carries_type_selfsign_and_label_keyed_sigs() {
     let identity = &doc["$tx"]["$i"]["identity"];
     assert_eq!(Some("ml-dsa-65"), identity["type"].as_str());
     assert_eq!(
-        Some(key.public_key_base64().as_str()),
+        Some(key.public_key().as_str()),
         identity["publicKey"].as_str()
     );
 

@@ -26,7 +26,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use futures_util::StreamExt;
 
 use activeledger::keys::ML_DSA_65_PUBLIC_KEY_SIZE;
-use activeledger::{Client, KeyPair, Object, Transaction};
+use activeledger::{Client, KeyPair, Object, Secp256k1KeyPair, Transaction};
 
 fn nodes() -> Vec<String> {
     split("AL_NODES")
@@ -133,11 +133,65 @@ async fn an_identity_onboards_and_is_recorded_correctly() {
     assert_eq!(Some("ml-dsa-65"), authority["type"].as_str());
 
     let stored = authority["public"].as_str().expect("public key");
-    assert_eq!(key.public_key_base64(), stored);
+    assert_eq!(key.public_key(), stored);
     assert_eq!(
         ML_DSA_65_PUBLIC_KEY_SIZE,
         STANDARD.decode(stored).unwrap().len()
     );
+}
+
+/// secp256k1 identities, in both public key forms.
+///
+/// The ledger accepts either and tells them apart by length, so onboarding
+/// only ever with the compressed form would leave the other path unproven.
+#[tokio::test]
+async fn a_secp256k1_identity_onboards_and_is_recorded_correctly() {
+    let nodes = require_network!();
+    assert!(!storage().is_empty(), "AL_STORAGE is needed for this test");
+
+    for (compressed, expected_chars) in [(true, 68), (false, 132)] {
+        let client = Client::new(&nodes[0]);
+        let key = Secp256k1KeyPair::generate_with(compressed);
+        let identity = client.onboard(&key).await.expect("onboard");
+
+        let authorities = await_authorities(0, &identity.stream_id).await;
+        let stored = authorities[0]["public"].as_str().expect("public key");
+
+        assert_eq!(Some("secp256k1"), authorities[0]["type"].as_str());
+
+        // Stored as 0x-prefixed hex, NOT base64. If this ever comes back
+        // base64 the SDK has encoded it the post-quantum way, and every later
+        // signature fails as 1220.
+        assert!(
+            stored.starts_with("0x"),
+            "the ledger stored '{stored}', which is not 0x hex"
+        );
+        assert_eq!(expected_chars, stored.len());
+        assert_eq!(key.public_key(), stored);
+    }
+}
+
+#[tokio::test]
+async fn a_secp256k1_signed_transaction_is_accepted() {
+    let nodes = require_network!();
+
+    let client = Client::new(&nodes[0]);
+    let key = Secp256k1KeyPair::generate();
+    let identity = client.onboard(&key).await.expect("onboard");
+
+    let tx = Transaction::builder()
+        .namespace("default")
+        .contract("namespace")
+        .input_with(
+            &identity.stream_id,
+            &key,
+            Object::new().set("namespace", unique("rustec")),
+        )
+        .build()
+        .unwrap();
+
+    let response = client.submit(&tx).await.expect("submit");
+    assert!(response.committed(), "rejected: {}", response.raw());
 }
 
 #[tokio::test]

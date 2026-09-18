@@ -1,6 +1,6 @@
 [package]
 name = "activeledger"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2021"
 # Verified by building on it, not guessed. The floor comes from the
 # dependency graph rather than from this crate's own code: reqwest pulls in
@@ -21,6 +21,13 @@ license = "MIT"
 # ledger stores, with no wrapping or re-encoding step.
 fips204 = "0.4"
 base64 = "0.22"
+hex = "0.4"
+
+# secp256k1. RustCrypto, pure Rust, no C toolchain. Its signing is already
+# RFC 6979 deterministic with S normalised low, which matches the reference
+# implementation byte for byte - but its VERIFICATION rejects high-S, which
+# the ledger produces freely, so that path is handled explicitly.
+k256 = { version = "0.13", features = ["ecdsa"] }
 serde_json = "1"
 thiserror = "2"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }

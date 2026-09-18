@@ -54,14 +54,69 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Key types
+
+| Key type | Wire string | Public | Private | Signature | Encoding |
+|---|---|---|---|---|---|
+| ML-DSA-65 | `ml-dsa-65` | 1952 | 4032 | 3309 | base64 |
+| secp256k1 | `secp256k1` | 33 or 65 | 32 | ~70-72, variable | `0x` hex |
+| Falcon-512 | `falcon-512` | — | — | not supported here | — |
+
+Use **secp256k1** unless the identity must outlive a cryptographically
+relevant quantum computer: it is roughly **22x smaller** per transaction, and
+every byte is stored on the ledger permanently and replicated to every node.
+It also works with hardware wallets and HSMs, and it is the only way to sign
+for an identity created before post-quantum support.
+
+```rust
+use activeledger::Secp256k1KeyPair;
+
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let key = Secp256k1KeyPair::generate();                  // compressed
+let full = Secp256k1KeyPair::generate_with(false);       // uncompressed
+
+let public = key.public_key();                           // "0x02a1b2..."
+let private = key.private_key().expect("this pair can sign");
+
+let restored = Secp256k1KeyPair::from_keys(&public, &private)?;
+let verifier = Secp256k1KeyPair::from_public(&public)?;
+# let _ = (full, restored, verifier);
+# Ok(())
+# }
+```
+
+### secp256k1 is encoded nothing like the post-quantum keys
+
+- **Keys are `0x`-prefixed hex, not base64.** The prefix is required rather
+  than tolerated, because hex without it can decode as base64 into
+  plausible-looking bytes of the wrong length.
+- **Public keys have two valid lengths**, 33 compressed and 65 uncompressed,
+  and the ledger accepts both. A length and a SEC1 point prefix that disagree
+  are rejected by name.
+- **Private scalars are always 32 bytes.** A leading zero byte occurs about
+  once in 400 keys, and a value that dropped it is a different scalar.
+- **Signatures are SHA-256 → ECDSA → DER**, and DER length varies.
+
+### low-S, in both directions
+
+**Signing** is RFC 6979 deterministic and low-S. That is not for the ledger,
+which accepts either, but for `@noble/curves` — the reference for the
+JavaScript side — and libsecp256k1, both of which reject high-S by default.
+
+**Verification deliberately accepts high-S.** This is the one that bites in
+Rust: `k256` rejects high-S outright, and measured against the published
+vectors its unmodified path rejects **7 of 12 valid signatures**. The ledger
+verifies through OpenSSL and produces high-S freely, so this SDK normalises
+before verifying — `(r, s)` and `(r, n - s)` are the same signature, so
+nothing is weakened.
+
+Because signing is deterministic, this SDK's signatures are byte-identical to
+`@noble/curves` for the same key and message, and the test suite asserts
+exactly that against published reference bytes.
+
 ## Post-quantum support
 
 **ML-DSA-65 is supported. Falcon-512 is not.**
-
-| Key type | Wire string | Public | Private | Signature |
-|---|---|---|---|---|
-| ML-DSA-65 | `ml-dsa-65` | 1952 | 4032 | 3309 |
-| Falcon-512 | `falcon-512` | — | — | not supported here |
 
 Falcon identities work on the ledger and are supported by the JS, JVM and C#
 SDKs. They are not supported in Rust because no pure-Rust implementation reads
@@ -77,8 +132,8 @@ use activeledger::KeyPair;
 let key = KeyPair::generate()?;
 
 // Base64, in exactly the encoding the ledger stores
-let public = key.public_key_base64();
-let private = key.private_key_base64().expect("this pair can sign");
+let public = key.public_key();
+let private = key.private_key().expect("this pair can sign");
 
 // Round-trip a stored key
 let restored = KeyPair::from_keys(&public, &private)?;
@@ -244,7 +299,7 @@ impl Signer for HsmSigner {
     fn key_type(&self) -> KeyType {
         KeyType::MlDsa65
     }
-    fn public_key_base64(&self) -> String {
+    fn public_key(&self) -> String {
         // ...
         # String::new()
     }
