@@ -51,6 +51,7 @@ pub mod canonical;
 pub mod connection;
 pub mod events;
 pub mod keys;
+pub mod recovery;
 pub mod secp256k1;
 pub mod transaction;
 

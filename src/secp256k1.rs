@@ -53,6 +53,58 @@ impl Secp256k1KeyPair {
         }
     }
 
+    /// Derives a key pair from a 32-byte seed.
+    ///
+    /// For secp256k1 the seed IS the private scalar -- there is no key
+    /// derivation step -- which is why it has to be a valid one. A scalar of
+    /// zero, or one at or above the group order, is refused rather than
+    /// reduced mod n: reducing produces a perfectly functional key belonging
+    /// to a different identity, and nothing downstream ever reports a
+    /// problem.
+    pub fn from_seed(seed: &[u8], compressed: bool) -> Result<Self, KeyError> {
+        if seed.len() != PRIVATE_KEY_SIZE {
+            return Err(KeyError::WrongSeedLength {
+                key_type: "secp256k1",
+                actual: seed.len(),
+                expected: PRIVATE_KEY_SIZE,
+            });
+        }
+
+        // from_slice rejects an out-of-range scalar rather than reducing it,
+        // which is the behaviour wanted here.
+        let signing = SigningKey::from_slice(seed).map_err(|_| KeyError::InvalidScalar)?;
+        let verifying = *signing.verifying_key();
+
+        Ok(Self {
+            public_bytes: verifying.to_encoded_point(compressed).as_bytes().to_vec(),
+            verifying,
+            signing: Some(signing),
+        })
+    }
+
+    /// Derives a key pair from a BIP-39 recovery phrase.
+    pub fn from_phrase(phrase: &str, passphrase: &str, compressed: bool) -> Result<Self, KeyError> {
+        let bip39_seed = crate::recovery::to_seed(phrase, passphrase)?;
+        let seed = crate::recovery::derive_seed(KeyType::Secp256k1, &bip39_seed)?;
+        Self::from_seed(&seed, compressed)
+    }
+
+    /// Recovers a key pair from a phrase made by `@activeledger/sdk-bip39`.
+    ///
+    /// That scheme is SHA256(phrase) used directly as the scalar -- no key
+    /// stretching, no domain separation, no passphrase. It exists so an old
+    /// phrase can be recovered, never so a new key can be made with it.
+    ///
+    /// Deliberately does NOT validate the mnemonic: the original package
+    /// hashed the string as given and never consulted the wordlist, so
+    /// rejecting a phrase here that it accepted would make a recoverable
+    /// identity unrecoverable.
+    pub fn from_legacy_phrase(phrase: &str, compressed: bool) -> Result<Self, KeyError> {
+        use sha2::{Digest, Sha256};
+
+        Self::from_seed(&Sha256::digest(phrase.as_bytes()), compressed)
+    }
+
     /// A verify-only key pair from a stored public key.
     pub fn from_public(public_key: &str) -> Result<Self, KeyError> {
         let bytes = decode_hex(public_key, "public")?;

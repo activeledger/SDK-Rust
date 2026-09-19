@@ -54,6 +54,62 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Seeds and recovery phrases
+
+```rust
+use activeledger::{KeyPair, secp256k1::Secp256k1KeyPair};
+
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let seed = [0x11u8; 32];
+let phrase = "legal winner thank year wave sausage worth useful legal winner thank yellow";
+
+let pq = KeyPair::from_seed(&seed)?;                       // 32 bytes
+let pq_recovered = KeyPair::from_phrase(phrase, "")?;      // BIP-39
+
+let ec = Secp256k1KeyPair::from_seed(&seed, true)?;
+let ec_recovered = Secp256k1KeyPair::from_phrase(phrase, "", true)?;
+# let _ = (pq, pq_recovered, ec, ec_recovered);
+# Ok(())
+# }
+```
+
+The same seed gives the same identity in every Activeledger SDK, which is what
+makes a seed the portable private-key format — it is how a private key moves
+between languages. It matters most for PHP, whose ML-DSA-65 private key **is**
+a 32-byte seed and which has no 4032-byte form at all.
+
+A seed of the wrong length is **refused, not padded**: a padded seed is a
+different identity, not a malformed one.
+
+For `secp256k1` the seed **is** the private scalar, so it has to be a valid
+one. A seed of zero, or one at or above the curve order, is refused rather
+than reduced mod *n* — reducing produces a perfectly functional key belonging
+to a different identity, and nothing downstream ever reports a problem.
+
+The phrase is validated, wordlist **and** checksum. A mistyped phrase that is
+not checked does not fail; it derives a valid key for an identity nobody owns,
+and the only symptom is the ledger not recognising it.
+
+`Secp256k1KeyPair::from_legacy_phrase` recovers a phrase made by the older
+`@activeledger/sdk-bip39` package — recovery only, never for new keys.
+
+### The derivation
+
+| Type | Seed from the BIP-39 seed `S` |
+| --- | --- |
+| `secp256k1` | `HMAC-SHA512("Bitcoin seed", S)[0..32]` |
+| `ml-dsa-65` | `HKDF-SHA512(S, salt="", info="activeledger-seed-v1:ml-dsa-65", 32)` |
+| `falcon-512` | `HKDF-SHA512(S, salt="", info="activeledger-seed-v1:falcon-512", 48)` |
+
+`secp256k1` deliberately does not use HKDF: the JavaScript SDK shipped that
+derivation before the post-quantum types existed, so phrases are already in
+use, and changing it would hand those users a different key for a phrase that
+used to work.
+
+`recovery::derive_seed` implements all three — including `falcon-512`, which
+this SDK cannot otherwise use, so a phrase here can still produce the seed for
+a Falcon identity created elsewhere.
+
 ## Key types
 
 | Key type | Wire string | Public | Private | Signature | Encoding |

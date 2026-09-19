@@ -28,6 +28,13 @@ hex = "0.4"
 # implementation byte for byte - but its VERIFICATION rejects high-S, which
 # the ledger produces freely, so that path is handled explicitly.
 k256 = { version = "0.13", features = ["ecdsa"] }
+# BIP-39 and the seed derivations. All three are RustCrypto, pure Rust and
+# already in the graph under k256, so they add no new build requirement.
+# HKDF is written out in recovery.rs rather than pulled in as a fourth crate:
+# it is a dozen lines of HMAC, and it is checked against node and PHP.
+hmac = "0.12"
+sha2 = "0.10"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 serde_json = "1"
 thiserror = "2"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }

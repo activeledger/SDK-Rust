@@ -2,7 +2,7 @@
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use fips204::ml_dsa_65;
-use fips204::traits::{SerDes, Signer as _, Verifier as _};
+use fips204::traits::{KeyGen as _, SerDes, Signer as _, Verifier as _};
 
 /// Key algorithms, with the exact strings the ledger uses.
 ///
@@ -106,6 +106,42 @@ pub enum KeyError {
     #[error("signing failed")]
     SigningFailed,
 
+    #[error(
+        "{key_type} needs a {expected}-byte seed, got {actual}. It is refused rather than \
+         padded: a padded seed is a different identity, not a malformed one."
+    )]
+    WrongSeedLength {
+        key_type: &'static str,
+        actual: usize,
+        expected: usize,
+    },
+
+    /// A secp256k1 seed IS the private scalar, so it has to be a valid one.
+    ///
+    /// Refused rather than reduced mod n: reducing produces a perfectly
+    /// functional key belonging to a different identity, and nothing
+    /// downstream ever reports a problem.
+    #[error("seed is not a valid secp256k1 private key - the scalar must be in [1, n-1]")]
+    InvalidScalar,
+
+    #[error("a BIP-39 phrase is 12, 15, 18, 21 or 24 words, got {actual}")]
+    WrongWordCount { actual: usize },
+
+    #[error("word {position} (\"{word}\") is not in the BIP-39 English wordlist")]
+    UnknownWord { position: usize, word: String },
+
+    /// An unchecked phrase is a silent failure, not a loud one: it derives a
+    /// perfectly valid key for an identity nobody owns.
+    #[error(
+        "the BIP-39 checksum does not match - the phrase has a typo or the words are in the \
+         wrong order. Deriving from it anyway would produce a valid key for an identity \
+         nobody owns."
+    )]
+    BadChecksum,
+
+    #[error("a BIP-39 seed is 64 bytes, got {actual}")]
+    WrongBip39SeedLength { actual: usize },
+
     /// Falcon-512 identities work on the ledger and are supported by the JS,
     /// JVM and C# SDKs. They are not supported here.
     ///
@@ -153,6 +189,43 @@ impl KeyPair {
             public_bytes,
             private_bytes: Some(private_bytes),
         })
+    }
+
+    /// Derives a key pair from a 32-byte seed (FIPS 204's xi).
+    ///
+    /// This is how an ML-DSA-65 private key moves between Activeledger SDKs.
+    /// The PHP SDK's private key IS a seed -- its library implements FIPS 204
+    /// key generation from a seed but not skEncode/skDecode -- so the
+    /// 4032-byte encoding this SDK exports cannot be loaded there. The seed
+    /// can be, and gives an identical public key: verified against the
+    /// published vectors and against BouncyCastle.
+    pub fn from_seed(seed: &[u8]) -> Result<Self, KeyError> {
+        let seed: [u8; 32] = seed.try_into().map_err(|_| KeyError::WrongSeedLength {
+            key_type: "ml-dsa-65",
+            actual: seed.len(),
+            expected: 32,
+        })?;
+
+        let (public, private) = ml_dsa_65::KG::keygen_from_seed(&seed);
+        let public_bytes = public.clone().into_bytes().to_vec();
+        let private_bytes = private.clone().into_bytes().to_vec();
+
+        Ok(Self {
+            public,
+            private: Some(private),
+            public_bytes,
+            private_bytes: Some(private_bytes),
+        })
+    }
+
+    /// Derives a key pair from a BIP-39 recovery phrase.
+    ///
+    /// One phrase can back an ml-dsa-65 and a secp256k1 identity at once:
+    /// each type derives its own seed, so neither reveals the other.
+    pub fn from_phrase(phrase: &str, passphrase: &str) -> Result<Self, KeyError> {
+        let bip39_seed = crate::recovery::to_seed(phrase, passphrase)?;
+        let seed = crate::recovery::derive_seed(KeyType::MlDsa65, &bip39_seed)?;
+        Self::from_seed(&seed)
     }
 
     /// A verify-only key pair from a stored public key.
