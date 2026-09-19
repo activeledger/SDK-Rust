@@ -57,12 +57,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ## Seeds and recovery phrases
 
 ```rust
-use activeledger::{KeyPair, recovery, secp256k1::Secp256k1KeyPair};
+use activeledger::{KeyPair, secp256k1::Secp256k1KeyPair};
 
-let pq = KeyPair::from_seed(&seed)?;                        // 32 bytes
-let pq = KeyPair::from_phrase(phrase, "")?;                 // BIP-39
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let seed = [0x11u8; 32];
+let phrase = "legal winner thank year wave sausage worth useful legal winner thank yellow";
+
+let pq = KeyPair::from_seed(&seed)?;                       // 32 bytes
+let pq_recovered = KeyPair::from_phrase(phrase, "")?;      // BIP-39
+
 let ec = Secp256k1KeyPair::from_seed(&seed, true)?;
-let ec = Secp256k1KeyPair::from_phrase(phrase, "", true)?;
+let ec_recovered = Secp256k1KeyPair::from_phrase(phrase, "", true)?;
+# let _ = (pq, pq_recovered, ec, ec_recovered);
+# Ok(())
+# }
 ```
 
 The same seed gives the same identity in every Activeledger SDK, which is what
