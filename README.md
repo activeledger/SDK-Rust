@@ -16,11 +16,22 @@ This crate replaces three: `SDK-Rust`, `SDK-Rust-Events` and
 
 ## Install
 
+> [!WARNING]
+> **`activeledger = "2"` does not resolve.** crates.io serves only `0.1.0` and
+> `0.1.1`, published long before this rewrite and unrelated to it. Depend on
+> the tag instead:
+
 ```toml
 [dependencies]
-activeledger = "2"
-tokio = { version = "1", features = ["full"] }
+activeledger = { git = "https://github.com/activeledger/SDK-Rust", tag = "v2.2.0" }
 ```
+
+Verified: builds and derives keys from a clean project on stable.
+
+Publishing `2.x` to crates.io would be a breaking release for the existing
+`0.1.1` users rather than a first claim, so it is a deliberate decision rather
+than a missing token.
+
 
 ## Quick start
 
