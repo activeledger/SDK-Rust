@@ -23,7 +23,7 @@ This crate replaces three: `SDK-Rust`, `SDK-Rust-Events` and
 
 ```toml
 [dependencies]
-activeledger = { git = "https://github.com/activeledger/SDK-Rust", tag = "v2.2.0" }
+activeledger = { git = "https://github.com/activeledger/SDK-Rust", tag = "v2.3.0" }
 ```
 
 Verified: builds and derives keys from a clean project on stable.
