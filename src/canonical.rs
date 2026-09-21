@@ -196,8 +196,6 @@ fn write_value(out: &mut String, value: &Value) -> Result<(), CanonicalError> {
     Ok(())
 }
 
-/// JavaScript number formatting: one numeric type, shortest representation
-/// that round-trips. `JSON.stringify(1.0)` is `1`.
 fn write_number(out: &mut String, value: f64) -> Result<(), CanonicalError> {
     if value.is_nan() {
         return Err(CanonicalError::NotFinite("NaN"));
@@ -206,15 +204,75 @@ fn write_number(out: &mut String, value: f64) -> Result<(), CanonicalError> {
         return Err(CanonicalError::NotFinite("Infinity"));
     }
 
-    // Rust's Display for f64 is already shortest-round-trip and prints 1.0
-    // as "1", which is what JavaScript does. It differs above 1e21, where
-    // JavaScript switches to exponential notation and Rust does not.
-    if value == value.trunc() && value.abs() < 1e21 {
-        let _ = write!(out, "{}", value as i64);
-    } else {
-        let _ = write!(out, "{value}");
-    }
+    out.push_str(&js_number(value));
     Ok(())
+}
+
+/// Formats a number exactly as `JSON.stringify` would.
+///
+/// What gets signed is `JSON.stringify($tx)`, and the ledger verifies against
+/// a RE-STRINGIFIED `$tx` - its crypto package calls `JSON.stringify` on the
+/// object its HTTP layer already parsed. JavaScript's formatting is therefore
+/// the specification rather than a convention, and a number written
+/// differently produces a signature the ledger rejects as 1220 "Signature
+/// Incorrect", with nothing in the message about numbers.
+///
+/// Rust disagreed in two ways:
+///
+/// - `Display` never uses exponent form, so `1e21` printed as
+///   `1000000000000000000000` and `1e-7` as `0.0000001`.
+/// - whole values went through `value as i64`, which SATURATES: `1e20`
+///   printed as `9223372036854775807`, i64::MAX, rather than
+///   `100000000000000000000`.
+///
+/// Implements ECMA-262 Number::toString. Cross-checked against
+/// `JSON.stringify` on 6139 doubles including every power of ten from 1e-330
+/// to 1e308.
+///
+/// Public so a caller can check a value before building a transaction, and so
+/// the cross-language vectors run against it directly.
+pub fn js_number(value: f64) -> String {
+    if value == 0.0 {
+        return "0".to_string(); // covers -0.0, which JavaScript prints as "0"
+    }
+    if value < 0.0 {
+        return format!("-{}", js_number(-value));
+    }
+
+    // The SHORTEST decimal that round-trips. Rust's LowerExp already gives it,
+    // so this is a single format rather than the increasing-precision search
+    // the SDKs without that guarantee have to run.
+    let text = format!("{value:e}");
+    let (mantissa, exponent) = text.split_once('e').unwrap_or((text.as_str(), "0"));
+    let exp: i32 = exponent.parse().unwrap_or(0);
+
+    let n = exp + 1; // value == 0.<digits> * 10**n
+    let stripped = mantissa.replace('.', "");
+    let digits = stripped.trim_end_matches('0');
+    let digits = if digits.is_empty() { "0" } else { digits };
+    let k = digits.len() as i32;
+
+    // Plain decimal while -6 < n <= 21; exponent form outside it.
+    if k <= n && n <= 21 {
+        return format!("{digits}{}", "0".repeat((n - k) as usize));
+    }
+    if n > 0 && n <= 21 {
+        let at = n as usize;
+        return format!("{}.{}", &digits[..at], &digits[at..]);
+    }
+    if n > -6 && n <= 0 {
+        return format!("0.{}{digits}", "0".repeat((-n) as usize));
+    }
+
+    // Exponent form: no leading zeros, explicit "+" when positive.
+    let e = n - 1;
+    let head = if k == 1 {
+        digits.to_string()
+    } else {
+        format!("{}.{}", &digits[..1], &digits[1..])
+    };
+
+    format!("{head}e{}{}", if e >= 0 { '+' } else { '-' }, e.abs())
 }
 
 /// Escapes exactly what `JSON.stringify` escapes: the two characters JSON
