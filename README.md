@@ -1,4 +1,7 @@
-[![Activeledger](https://www.activeledger.io/wp-content/uploads/2018/09/Asset-1.png)](https://activeledger.io/)
+<a href="https://activeledger.io/"><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/activeledger/activeledger/master/docs/assets/Asset-23-dark.png">
+  <img src="https://raw.githubusercontent.com/activeledger/activeledger/master/docs/assets/Asset-23.png" alt="Activeledger" width="300"/>
+</picture></a>
 
 # Activeledger SDK for Rust
 
