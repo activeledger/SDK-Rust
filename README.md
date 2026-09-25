@@ -5,6 +5,10 @@
   </picture>
 </a>
 
+[![crates.io](https://img.shields.io/crates/v/activeledger)](https://crates.io/crates/activeledger)
+[![docs.rs](https://img.shields.io/docsrs/activeledger)](https://docs.rs/activeledger)
+[![licence](https://img.shields.io/badge/licence-MIT-blue)](https://github.com/activeledger/SDK-Rust/blob/master/LICENSE)
+
 # Activeledger SDK for Rust
 
 Build, sign and submit Activeledger transactions from Rust, with post-quantum
