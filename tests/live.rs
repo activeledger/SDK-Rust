@@ -20,6 +20,9 @@
 //!
 //! Skips when `AL_NODES` is unset, so `cargo test` works with no ledger.
 
+// The event API is deprecated; its behaviour stays tested until it is removed.
+#![allow(deprecated)]
+
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::{engine::general_purpose::STANDARD, Engine};

@@ -57,6 +57,7 @@ pub mod transaction;
 
 pub use canonical::{CanonicalError, Object, Value};
 pub use connection::{Client, ClientError, Identity, Response};
+#[allow(deprecated)] // re-exported until the next major version removes them
 pub use events::{Event, EventParser};
 pub use keys::{KeyError, KeyPair, KeyType, Signer};
 pub use secp256k1::Secp256k1KeyPair;

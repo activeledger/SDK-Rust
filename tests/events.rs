@@ -4,6 +4,9 @@
 //! rule is checked on its own -- including the ones that only show up when
 //! the network splits a line across two chunks.
 
+// The event API is deprecated; its behaviour stays tested until it is removed.
+#![allow(deprecated)]
+
 use activeledger::EventParser;
 
 fn parse(body: &str) -> Vec<activeledger::Event> {
