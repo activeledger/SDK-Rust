@@ -1,5 +1,8 @@
 //! Talking to a node.
 
+// The deprecated event types are still used here until they are removed.
+#![allow(deprecated)]
+
 use futures_util::stream::{Stream, StreamExt};
 
 use crate::events::{Event, EventParser};
@@ -136,6 +139,15 @@ impl Client {
     ///
     /// Activecore is a SEPARATE service on its own port, not a path on the
     /// node: a node answers 403 for every event route.
+    ///
+    /// Deprecated: ActiveCore is deprecated and no longer serves events. A node
+    /// serves contract events from its own storage service, which must never be
+    /// reachable beyond the node's host, so a client has nothing it should
+    /// connect to. Run your own server-sent events listener on the node's host.
+    #[deprecated(
+        since = "2.4.0",
+        note = "events are served on the node's host only and ActiveCore is deprecated; run your own server-sent events listener on the node's host. Removed in the next major version."
+    )]
     pub fn with_core(mut self, core_url: impl Into<String>) -> Self {
         self.core_url = Some(core_url.into().trim_end_matches('/').to_owned());
         self
@@ -152,6 +164,10 @@ impl Client {
         &self.base_url
     }
 
+    #[deprecated(
+        since = "2.4.0",
+        note = "events are served on the node's host only and ActiveCore is deprecated; run your own server-sent events listener on the node's host. Removed in the next major version."
+    )]
     pub fn core_url(&self) -> Option<&str> {
         self.core_url.as_deref()
     }
@@ -201,6 +217,15 @@ impl Client {
     /// emitted, so a subscriber watching there sees nothing for a
     /// transaction that emitted no event -- which looks exactly like a
     /// broken subscription.
+    ///
+    /// Deprecated: ActiveCore is deprecated and no longer serves events. A node
+    /// serves contract events from its own storage service, which must never be
+    /// reachable beyond the node's host, so a client has nothing it should
+    /// connect to. Run your own server-sent events listener on the node's host.
+    #[deprecated(
+        since = "2.4.0",
+        note = "events are served on the node's host only and ActiveCore is deprecated; run your own server-sent events listener on the node's host. Removed in the next major version."
+    )]
     pub async fn subscribe_to_activity(
         &self,
         stream_id: Option<&str>,
@@ -215,6 +240,15 @@ impl Client {
 
     /// Subscribes to events emitted by contracts: all of them, those from
     /// one contract, or one named event from one contract.
+    ///
+    /// Deprecated: ActiveCore is deprecated and no longer serves events. A node
+    /// serves contract events from its own storage service, which must never be
+    /// reachable beyond the node's host, so a client has nothing it should
+    /// connect to. Run your own server-sent events listener on the node's host.
+    #[deprecated(
+        since = "2.4.0",
+        note = "events are served on the node's host only and ActiveCore is deprecated; run your own server-sent events listener on the node's host. Removed in the next major version."
+    )]
     pub async fn subscribe_to_contract_events(
         &self,
         contract: Option<&str>,
@@ -240,6 +274,15 @@ impl Client {
     /// Subscribes to an arbitrary path or absolute URL.
     ///
     /// Dropping the returned stream closes the connection.
+    ///
+    /// Deprecated: ActiveCore is deprecated and no longer serves events. A node
+    /// serves contract events from its own storage service, which must never be
+    /// reachable beyond the node's host, so a client has nothing it should
+    /// connect to. Run your own server-sent events listener on the node's host.
+    #[deprecated(
+        since = "2.4.0",
+        note = "events are served on the node's host only and ActiveCore is deprecated; run your own server-sent events listener on the node's host. Removed in the next major version."
+    )]
     pub async fn subscribe(
         &self,
         path_or_url: &str,

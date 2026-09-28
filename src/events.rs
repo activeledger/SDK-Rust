@@ -1,6 +1,21 @@
 //! Server-sent events.
+//!
+//! Deprecated, with everything in it: events are served on the node's host
+//! only, and ActiveCore, which used to serve them, is deprecated.
+
+// The deprecated event types are still used here until they are removed.
+#![allow(deprecated)]
 
 /// One server-sent event.
+///
+/// Deprecated: ActiveCore is deprecated and no longer serves events. A node
+/// serves contract events from its own storage service, which must never be
+/// reachable beyond the node's host, so a client has nothing it should
+/// connect to. Run your own server-sent events listener on the node's host.
+#[deprecated(
+    since = "2.4.0",
+    note = "events are served on the node's host only and ActiveCore is deprecated; run your own server-sent events listener on the node's host. Removed in the next major version."
+)]
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Event {
     /// The `event:` field, if the server sent one.
@@ -18,6 +33,15 @@ pub struct Event {
 /// heartbeat and must not surface as an empty event, `event:` and `id:`
 /// belong to one event and must not leak into the next, and exactly one
 /// space after the colon is framing while every other byte is payload.
+///
+/// Deprecated: ActiveCore is deprecated and no longer serves events. A node
+/// serves contract events from its own storage service, which must never be
+/// reachable beyond the node's host, so a client has nothing it should
+/// connect to. Run your own server-sent events listener on the node's host.
+#[deprecated(
+    since = "2.4.0",
+    note = "events are served on the node's host only and ActiveCore is deprecated; run your own server-sent events listener on the node's host. Removed in the next major version."
+)]
 #[derive(Debug, Default)]
 pub struct EventParser {
     buffer: String,
