@@ -30,6 +30,17 @@ This crate replaces three: `SDK-Rust`, `SDK-Rust-Events` and
 activeledger = "2"
 ```
 
+Requires Rust 1.88 or later (`rust-version` in `Cargo.toml`).
+
+The crate does not bring an async runtime or a stream combinator with it. The
+examples below that use `#[tokio::main]` or `StreamExt` need you to add
+`tokio` and `futures-util` to your own `[dependencies]`:
+
+```toml
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+futures-util = "0.3"
+```
+
 `2.x` is a ground-up rewrite. The `0.1.x` releases on crates.io predate it and
 share nothing with it but the name.
 
@@ -306,6 +317,12 @@ for value in response.responses() {
 ```
 
 `response.new_streams()` gives the ids of any streams the transaction created.
+
+`Response` has `committed()`, `errors()`, `new_streams()`, `responses()` and
+`raw()`. `committed()` is true when `errors()` is empty, and `errors()` is
+empty when the body is not valid JSON. A proxy error page or a truncated reply
+therefore reports `committed() == true`; check `raw()` if the node might not
+be the thing answering.
 
 ## Events (SSE) - deprecated
 
