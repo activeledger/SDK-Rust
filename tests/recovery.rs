@@ -113,9 +113,24 @@ fn derive_seed_refuses_a_bip39_seed_of_the_wrong_length() {
 fn derived_seeds_have_the_length_the_key_type_takes() {
     let bip39 = [9u8; BIP39_SEED_SIZE];
 
-    assert_eq!(32, recovery::derive_seed(KeyType::MlDsa65, &bip39).unwrap().len());
-    assert_eq!(32, recovery::derive_seed(KeyType::Secp256k1, &bip39).unwrap().len());
-    assert_eq!(48, recovery::derive_seed(KeyType::Falcon512, &bip39).unwrap().len());
+    assert_eq!(
+        32,
+        recovery::derive_seed(KeyType::MlDsa65, &bip39)
+            .unwrap()
+            .len()
+    );
+    assert_eq!(
+        32,
+        recovery::derive_seed(KeyType::Secp256k1, &bip39)
+            .unwrap()
+            .len()
+    );
+    assert_eq!(
+        48,
+        recovery::derive_seed(KeyType::Falcon512, &bip39)
+            .unwrap()
+            .len()
+    );
     assert!(recovery::derive_seed(KeyType::Rsa, &bip39).is_err());
 }
 

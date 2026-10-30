@@ -94,18 +94,33 @@ fn onboard_with_a_custom_signer_uses_its_key_type_and_public_key() {
     let tx = Transaction::onboard(&Fixed, "identity").unwrap();
     let doc: serde_json::Value = serde_json::from_str(&tx.to_json().unwrap()).unwrap();
 
-    assert_eq!(Some("ml-dsa-65"), doc["$tx"]["$i"]["identity"]["type"].as_str());
-    assert_eq!(Some("pub"), doc["$tx"]["$i"]["identity"]["publicKey"].as_str());
+    assert_eq!(
+        Some("ml-dsa-65"),
+        doc["$tx"]["$i"]["identity"]["type"].as_str()
+    );
+    assert_eq!(
+        Some("pub"),
+        doc["$tx"]["$i"]["identity"]["publicKey"].as_str()
+    );
 }
 
 #[test]
 fn builder_errors_report_what_is_missing() {
     let key = KeyPair::generate().unwrap();
-    let no_namespace = Transaction::builder().contract("c").input("s", &key).build();
-    let no_contract = Transaction::builder().namespace("n").input("s", &key).build();
+    let no_namespace = Transaction::builder()
+        .contract("c")
+        .input("s", &key)
+        .build();
+    let no_contract = Transaction::builder()
+        .namespace("n")
+        .input("s", &key)
+        .build();
     let no_input = Transaction::builder().namespace("n").contract("c").build();
 
-    assert_eq!("namespace is required", no_namespace.unwrap_err().to_string());
+    assert_eq!(
+        "namespace is required",
+        no_namespace.unwrap_err().to_string()
+    );
     assert_eq!("contract is required", no_contract.unwrap_err().to_string());
     assert_eq!(
         "at least one input with a signing key is required",

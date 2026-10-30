@@ -36,7 +36,11 @@ fn serve(status: &str, content_type: &str, reply: &'static str) -> (String, Join
             if let Some(split) = text.find("\r\n\r\n") {
                 let length = text[..split]
                     .lines()
-                    .find_map(|l| l.to_ascii_lowercase().strip_prefix("content-length:").map(|v| v.trim().parse::<usize>().unwrap()))
+                    .find_map(|l| {
+                        l.to_ascii_lowercase()
+                            .strip_prefix("content-length:")
+                            .map(|v| v.trim().parse::<usize>().unwrap())
+                    })
                     .unwrap_or(0);
                 if received.len() >= split + 4 + length {
                     break;
@@ -108,7 +112,8 @@ async fn an_empty_body_does_not_panic() {
 
 #[tokio::test]
 async fn wrongly_shaped_json_yields_empty_accessors() {
-    let response = submit(r#"{"$summary":{"errors":"oops"},"$streams":{"new":7},"$responses":"x"}"#).await;
+    let response =
+        submit(r#"{"$summary":{"errors":"oops"},"$streams":{"new":7},"$responses":"x"}"#).await;
 
     assert!(response.errors().is_empty());
     assert!(response.new_streams().is_empty());
@@ -118,7 +123,8 @@ async fn wrongly_shaped_json_yields_empty_accessors() {
 #[tokio::test]
 async fn new_streams_returns_ids_and_skips_entries_without_one() {
     let response =
-        submit(r#"{"$streams":{"new":[{"id":"abc"},{"name":"no id"},{"id":7},{"id":"def"}]}}"#).await;
+        submit(r#"{"$streams":{"new":[{"id":"abc"},{"name":"no id"},{"id":7},{"id":"def"}]}}"#)
+            .await;
 
     assert_eq!(vec!["abc", "def"], response.new_streams());
 }
@@ -146,11 +152,16 @@ async fn submit_posts_the_envelope_as_json_to_the_root_path() {
 
     let (url, server) = serve("200 OK", "application/json", "{}");
     // A trailing slash on the base URL must not produce a "//" path.
-    Client::new(format!("{url}/")).submit(&tx).await.expect("submit");
+    Client::new(format!("{url}/"))
+        .submit(&tx)
+        .await
+        .expect("submit");
     let request = server.join().expect("server");
 
     assert!(request.starts_with("POST / HTTP/1.1\r\n"), "{request}");
-    assert!(request.to_ascii_lowercase().contains("content-type: application/json"));
+    assert!(request
+        .to_ascii_lowercase()
+        .contains("content-type: application/json"));
     let body = request.split("\r\n\r\n").nth(1).expect("body");
     assert_eq!(tx.to_json().unwrap(), body);
 }
@@ -158,7 +169,11 @@ async fn submit_posts_the_envelope_as_json_to_the_root_path() {
 #[tokio::test]
 async fn onboard_returns_the_new_stream_and_the_signers_key() {
     let key = KeyPair::generate().expect("generate");
-    let (url, server) = serve("200 OK", "application/json", r#"{"$streams":{"new":[{"id":"stream-1"}]}}"#);
+    let (url, server) = serve(
+        "200 OK",
+        "application/json",
+        r#"{"$streams":{"new":[{"id":"stream-1"}]}}"#,
+    );
 
     let identity = Client::new(url).onboard(&key).await.expect("onboard");
     let request = server.join().expect("server");
@@ -171,7 +186,11 @@ async fn onboard_returns_the_new_stream_and_the_signers_key() {
 #[tokio::test]
 async fn a_rejected_onboard_is_an_error_carrying_the_raw_reply() {
     let key = KeyPair::generate().expect("generate");
-    let (url, server) = serve("200 OK", "application/json", r#"{"$summary":{"errors":["nope"]}}"#);
+    let (url, server) = serve(
+        "200 OK",
+        "application/json",
+        r#"{"$summary":{"errors":["nope"]}}"#,
+    );
 
     let error = Client::new(url).onboard(&key).await.expect_err("must fail");
     server.join().expect("server");
@@ -185,7 +204,11 @@ async fn a_rejected_onboard_is_an_error_carrying_the_raw_reply() {
 #[tokio::test]
 async fn an_unreachable_node_is_an_http_error() {
     // Bind then drop, so the port is known to be closed.
-    let port = TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let port = TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
 
     let error = Client::new(format!("http://127.0.0.1:{port}"))
         .submit_raw("{}")
@@ -223,7 +246,10 @@ async fn an_event_name_without_a_contract_is_refused() {
     let client = Client::new("http://127.0.0.1:1").with_core("http://127.0.0.1:1");
 
     assert!(matches!(
-        client.subscribe_to_contract_events(None, Some("ev")).await.err(),
+        client
+            .subscribe_to_contract_events(None, Some("ev"))
+            .await
+            .err(),
         Some(ClientError::EventWithoutContract)
     ));
 }
@@ -232,13 +258,18 @@ async fn an_event_name_without_a_contract_is_refused() {
 async fn a_rejected_subscription_is_an_error_not_an_empty_stream() {
     let (url, server) = serve("403 Forbidden", "text/plain", "no");
 
-    let result = Client::new("http://127.0.0.1:1").with_core(url).subscribe_to_activity(None).await;
+    let result = Client::new("http://127.0.0.1:1")
+        .with_core(url)
+        .subscribe_to_activity(None)
+        .await;
     server.join().expect("server");
 
     assert!(matches!(result.err(), Some(ClientError::Http(_))));
 }
 
-async fn requested_path(call: impl FnOnce(Client) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()>>>) -> String {
+async fn requested_path(
+    call: impl FnOnce(Client) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()>>>,
+) -> String {
     let (url, server) = serve("200 OK", "text/event-stream", "");
     call(Client::new("http://127.0.0.1:1").with_core(url)).await;
     let request = server.join().expect("server");
@@ -247,19 +278,56 @@ async fn requested_path(call: impl FnOnce(Client) -> std::pin::Pin<Box<dyn std::
 
 #[tokio::test]
 async fn subscription_paths_are_built_and_percent_encoded() {
-    let line = requested_path(|c| Box::pin(async move { c.subscribe_to_activity(None).await.map(drop).unwrap(); })).await;
+    let line = requested_path(|c| {
+        Box::pin(async move {
+            c.subscribe_to_activity(None).await.map(drop).unwrap();
+        })
+    })
+    .await;
     assert_eq!("GET /api/activity/subscribe HTTP/1.1", line);
 
-    let line = requested_path(|c| Box::pin(async move { c.subscribe_to_activity(Some("a b/c")).await.map(drop).unwrap(); })).await;
+    let line = requested_path(|c| {
+        Box::pin(async move {
+            c.subscribe_to_activity(Some("a b/c"))
+                .await
+                .map(drop)
+                .unwrap();
+        })
+    })
+    .await;
     assert_eq!("GET /api/activity/subscribe/a%20b%2Fc HTTP/1.1", line);
 
-    let line = requested_path(|c| Box::pin(async move { c.subscribe_to_contract_events(None, None).await.map(drop).unwrap(); })).await;
+    let line = requested_path(|c| {
+        Box::pin(async move {
+            c.subscribe_to_contract_events(None, None)
+                .await
+                .map(drop)
+                .unwrap();
+        })
+    })
+    .await;
     assert_eq!("GET /api/events HTTP/1.1", line);
 
-    let line = requested_path(|c| Box::pin(async move { c.subscribe_to_contract_events(Some("my contract"), None).await.map(drop).unwrap(); })).await;
+    let line = requested_path(|c| {
+        Box::pin(async move {
+            c.subscribe_to_contract_events(Some("my contract"), None)
+                .await
+                .map(drop)
+                .unwrap();
+        })
+    })
+    .await;
     assert_eq!("GET /api/events/my%20contract HTTP/1.1", line);
 
-    let line = requested_path(|c| Box::pin(async move { c.subscribe_to_contract_events(Some("c"), Some("é")).await.map(drop).unwrap(); })).await;
+    let line = requested_path(|c| {
+        Box::pin(async move {
+            c.subscribe_to_contract_events(Some("c"), Some("é"))
+                .await
+                .map(drop)
+                .unwrap();
+        })
+    })
+    .await;
     assert_eq!("GET /api/events/c/%C3%A9 HTTP/1.1", line);
 }
 
@@ -279,7 +347,9 @@ async fn a_subscription_delivers_parsed_events_and_ends_with_the_connection() {
     let events: Vec<_> = stream.collect().await;
     let request = server.join().expect("server");
 
-    assert!(request.to_ascii_lowercase().contains("accept: text/event-stream"));
+    assert!(request
+        .to_ascii_lowercase()
+        .contains("accept: text/event-stream"));
     assert_eq!(2, events.len());
     let first = events[0].as_ref().expect("event");
     assert_eq!(Some("ping".to_owned()), first.name);
