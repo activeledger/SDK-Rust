@@ -135,6 +135,32 @@ fn ml_dsa_from_keys_checks_the_private_half_separately() {
     );
 }
 
+/// Right-length private bytes that belong to a different key pair decode fine,
+/// so only a consistency check against the public key can refuse them.
+#[test]
+fn ml_dsa_from_keys_rejects_a_private_key_from_another_pair() {
+    let a = KeyPair::generate().unwrap();
+    let b = KeyPair::generate().unwrap();
+
+    let error = KeyPair::from_keys(&a.public_key(), &b.private_key().unwrap()).unwrap_err();
+    assert!(
+        matches!(error, KeyError::Malformed { role: "private" }),
+        "{error}"
+    );
+}
+
+#[test]
+fn ml_dsa_from_keys_rejects_arbitrary_private_bytes_of_the_right_length() {
+    let key = KeyPair::generate().unwrap();
+    let junk = STANDARD.encode(vec![7u8; 4032]);
+
+    let error = KeyPair::from_keys(&key.public_key(), &junk).unwrap_err();
+    assert!(
+        matches!(error, KeyError::Malformed { role: "private" }),
+        "{error}"
+    );
+}
+
 #[test]
 fn ml_dsa_from_keys_restores_a_pair_that_signs_for_the_original() {
     let original = KeyPair::generate().expect("keygen");
