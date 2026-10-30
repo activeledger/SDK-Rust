@@ -31,9 +31,9 @@
 //!
 //! ML-DSA-65 is supported and verified against the ledger's published
 //! cross-language vectors. **Falcon-512 is not**: no pure-Rust
-//! implementation reads the key encoding the ledger stores, so
-//! [`KeyError::FalconUnsupported`] is returned rather than a key the ledger
-//! would silently reject. The JS, JVM and C# SDKs support both.
+//! implementation reads the key encoding the ledger stores, so there is no
+//! Falcon key type here (`KeyError::FalconUnsupported` exists but nothing
+//! returns it). The JS, JVM and C# SDKs support both.
 
 #![forbid(unsafe_code)]
 #![warn(missing_debug_implementations)]

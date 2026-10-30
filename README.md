@@ -203,8 +203,9 @@ Falcon identities work on the ledger and are supported by the JS, JVM and C#
 SDKs. They are not supported in Rust because no pure-Rust implementation reads
 the key encoding the ledger stores — `fn-dsa` cannot decode the ledger's Falcon
 keys at all, which was established by trying it rather than by reading about
-it. [`KeyError::FalconUnsupported`] is returned instead of a key the ledger
-would silently reject as a bad signature.
+it. There is no Falcon key pair type here, so nothing creates or loads a
+Falcon key. (`KeyError::FalconUnsupported` exists but is not returned by
+anything; it is kept so code matching on it still compiles.)
 
 ```rust
 use activeledger::KeyPair;
@@ -319,10 +320,12 @@ for value in response.responses() {
 `response.new_streams()` gives the ids of any streams the transaction created.
 
 `Response` has `committed()`, `errors()`, `new_streams()`, `responses()` and
-`raw()`. `committed()` is true when `errors()` is empty, and `errors()` is
-empty when the body is not valid JSON. A proxy error page or a truncated reply
-therefore reports `committed() == true`; check `raw()` if the node might not
-be the thing answering.
+`raw()`, plus `status()` for the HTTP status. `committed()` is true only when
+the status is 2xx, the body is a JSON object and `errors()` is empty. A proxy
+error page, a truncated reply or any 4xx/5xx reply therefore reports
+`committed() == false`, with an entry in `errors()` saying why, unless the body
+is a JSON reply carrying its own errors, which are reported instead.
+`submit` still returns `Ok` for these; check `committed()`.
 
 ## Events (SSE) - deprecated
 
