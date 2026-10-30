@@ -41,12 +41,26 @@ pub enum ClientError {
 pub struct Response {
     raw: String,
     parsed: Option<serde_json::Value>,
+    status: u16,
 }
 
 impl Response {
-    fn new(raw: String) -> Self {
-        let parsed = serde_json::from_str(&raw).ok();
-        Self { raw, parsed }
+    fn new(raw: String, status: u16) -> Self {
+        // Only a JSON object can be a ledger reply; a bare string, number or
+        // array parses as JSON but carries nothing a reader could use.
+        let parsed = serde_json::from_str(&raw)
+            .ok()
+            .filter(serde_json::Value::is_object);
+        Self {
+            raw,
+            parsed,
+            status,
+        }
+    }
+
+    /// The HTTP status the node answered with.
+    pub fn status(&self) -> u16 {
+        self.status
     }
 
     /// The response body exactly as the node sent it.
@@ -60,8 +74,13 @@ impl Response {
     /// status was 200. The ledger answers 200 for a rejected transaction, so
     /// treating HTTP success as ledger success is wrong -- and wrong in a way
     /// that looks fine until something important silently did not happen.
+    ///
+    /// A reply that is not a JSON object, or whose HTTP status is not 2xx,
+    /// is not a ledger reply at all (a proxy error page, a truncated body),
+    /// so it reports an error of its own when the body names none.
     pub fn errors(&self) -> Vec<String> {
-        self.parsed
+        let reported: Vec<String> = self
+            .parsed
             .as_ref()
             .and_then(|v| v.get("$summary"))
             .and_then(|s| s.get("errors"))
@@ -75,10 +94,21 @@ impl Response {
                     })
                     .collect()
             })
-            .unwrap_or_default()
+            .unwrap_or_default();
+
+        if !reported.is_empty() {
+            reported
+        } else if !(200..300).contains(&self.status) {
+            vec![format!("HTTP status {}", self.status)]
+        } else if self.parsed.is_none() {
+            vec!["response body is not a JSON object".to_owned()]
+        } else {
+            reported
+        }
     }
 
-    /// True when [`Response::errors`] is empty. This, not the HTTP status.
+    /// True when [`Response::errors`] is empty: a 2xx reply carrying a JSON
+    /// object that reports no errors. This, not the HTTP status alone.
     pub fn committed(&self) -> bool {
         self.errors().is_empty()
     }
@@ -189,7 +219,8 @@ impl Client {
             .body(body.to_owned())
             .send()
             .await?;
-        Ok(Response::new(response.text().await?))
+        let status = response.status().as_u16();
+        Ok(Response::new(response.text().await?, status))
     }
 
     /// Onboards a new identity.
@@ -201,11 +232,11 @@ impl Client {
         let transaction = Transaction::onboard(signer, "identity")?;
         let response = self.submit(&transaction).await?;
         match response.new_streams().into_iter().next() {
-            Some(stream_id) => Ok(Identity {
+            Some(stream_id) if response.committed() => Ok(Identity {
                 stream_id,
                 public_key: signer.public_key(),
             }),
-            None => Err(ClientError::OnboardFailed(response.raw)),
+            _ => Err(ClientError::OnboardFailed(response.raw)),
         }
     }
 
