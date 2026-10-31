@@ -82,6 +82,32 @@ async fn a_reply_with_an_empty_error_list_is_committed() {
 }
 
 #[tokio::test]
+async fn a_reply_without_a_summary_object_is_not_committed() {
+    for body in [
+        "{}",
+        r#"{"$streams":{"new":[]}}"#,
+        r#"{"$summary":null}"#,
+        r#"{"$summary":"ok"}"#,
+        r#"{"$summary":[]}"#,
+    ] {
+        let response = submit(body).await;
+        assert!(!response.committed(), "{body}");
+        assert_eq!(
+            vec!["response has no $summary object"],
+            response.errors(),
+            "{body}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_summary_with_no_errors_key_is_committed() {
+    let response = submit(r#"{"$summary":{"commit":0}}"#).await;
+
+    assert!(response.committed());
+}
+
+#[tokio::test]
 async fn non_string_errors_are_reported_as_json_text() {
     let response = submit(r#"{"$summary":{"errors":[{"code":1220},42]}}"#).await;
 
@@ -213,7 +239,7 @@ async fn onboard_returns_the_new_stream_and_the_signers_key() {
     let (url, server) = serve(
         "200 OK",
         "application/json",
-        r#"{"$streams":{"new":[{"id":"stream-1"}]}}"#,
+        r#"{"$summary":{"commit":1},"$streams":{"new":[{"id":"stream-1"}]}}"#,
     );
 
     let identity = Client::new(url).onboard(&key).await.expect("onboard");
