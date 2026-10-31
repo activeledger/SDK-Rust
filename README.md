@@ -321,8 +321,9 @@ for value in response.responses() {
 
 `Response` has `committed()`, `errors()`, `new_streams()`, `responses()` and
 `raw()`, plus `status()` for the HTTP status. `committed()` is true only when
-the status is 2xx, the body is a JSON object and `errors()` is empty. A proxy
-error page, a truncated reply or any 4xx/5xx reply therefore reports
+the status is 2xx, the body is a JSON object with a `$summary` object and
+`errors()` is empty. A proxy error page, a truncated reply, a body without
+`$summary` (such as `{}`) or any 4xx/5xx reply therefore reports
 `committed() == false`, with an entry in `errors()` saying why, unless the body
 is a JSON reply carrying its own errors, which are reported instead.
 `submit` still returns `Ok` for these; check `committed()`.

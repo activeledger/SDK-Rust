@@ -438,3 +438,31 @@ fn error_messages_name_the_remedy_not_just_the_failure() {
         .to_string();
     assert!(prefix.contains("0x"), "{prefix}");
 }
+
+/// A well-formed scalar that does not derive the public key would sign
+/// signatures the ledger rejects; only a derivation check can refuse it.
+#[test]
+fn secp256k1_from_keys_rejects_a_private_key_from_another_pair() {
+    for compressed in [true, false] {
+        let a = Secp256k1KeyPair::generate_with(compressed);
+        let b = Secp256k1KeyPair::generate_with(compressed);
+
+        let error =
+            Secp256k1KeyPair::from_keys(&a.public_key(), &b.private_key().unwrap()).unwrap_err();
+        assert!(
+            matches!(error, KeyError::Malformed { role: "private" }),
+            "{error:?}"
+        );
+    }
+}
+
+#[test]
+fn secp256k1_from_keys_accepts_a_matching_pair_in_either_form() {
+    for compressed in [true, false] {
+        let key = Secp256k1KeyPair::generate_with(compressed);
+
+        let restored =
+            Secp256k1KeyPair::from_keys(&key.public_key(), &key.private_key().unwrap()).unwrap();
+        assert_eq!(key.public_key(), restored.public_key());
+    }
+}

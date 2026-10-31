@@ -188,7 +188,7 @@ async fn onboard_takes_the_first_new_stream_when_there_are_several() {
     let (url, server) = serve(
         "200 OK",
         "application/json",
-        r#"{"$streams":{"new":[{"id":"first"},{"id":"second"}]}}"#,
+        r#"{"$summary":{"commit":1},"$streams":{"new":[{"id":"first"},{"id":"second"}]}}"#,
     );
 
     let identity = Client::new(url)
@@ -206,7 +206,7 @@ async fn onboard_sends_the_signers_type_and_self_sign_marker() {
     let (url, server) = serve(
         "200 OK",
         "application/json",
-        r#"{"$streams":{"new":[{"id":"s"}]}}"#,
+        r#"{"$summary":{"commit":1},"$streams":{"new":[{"id":"s"}]}}"#,
     );
     let key = Secp256k1KeyPair::generate();
 
@@ -307,4 +307,18 @@ async fn a_subscription_refused_with_a_status_reports_that_status() {
         Ok(_) => panic!("a 404 must not become an empty stream"),
         Err(other) => panic!("unexpected error {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn onboard_fails_on_a_reply_without_a_summary_even_with_a_stream_id() {
+    let reply = r#"{"$streams":{"new":[{"id":"abc"}]}}"#;
+    let (url, server) = serve("200 OK", "application/json", reply);
+
+    let error = Client::new(url)
+        .onboard(&KeyPair::generate().expect("keygen"))
+        .await
+        .unwrap_err();
+    server.join().expect("server");
+
+    assert!(matches!(error, ClientError::OnboardFailed(_)), "{error:?}");
 }

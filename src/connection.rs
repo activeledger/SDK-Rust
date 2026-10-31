@@ -75,9 +75,10 @@ impl Response {
     /// treating HTTP success as ledger success is wrong -- and wrong in a way
     /// that looks fine until something important silently did not happen.
     ///
-    /// A reply that is not a JSON object, or whose HTTP status is not 2xx,
-    /// is not a ledger reply at all (a proxy error page, a truncated body),
-    /// so it reports an error of its own when the body names none.
+    /// A reply that is not a JSON object, whose HTTP status is not 2xx, or
+    /// that carries no `$summary` object is not a ledger reply at all (a
+    /// proxy error page, a truncated body, a bare `{}`), so it reports an
+    /// error of its own when the body names none.
     pub fn errors(&self) -> Vec<String> {
         let reported: Vec<String> = self
             .parsed
@@ -102,13 +103,20 @@ impl Response {
             vec![format!("HTTP status {}", self.status)]
         } else if self.parsed.is_none() {
             vec!["response body is not a JSON object".to_owned()]
+        } else if !self
+            .parsed
+            .as_ref()
+            .and_then(|v| v.get("$summary"))
+            .is_some_and(serde_json::Value::is_object)
+        {
+            vec!["response has no $summary object".to_owned()]
         } else {
             reported
         }
     }
 
     /// True when [`Response::errors`] is empty: a 2xx reply carrying a JSON
-    /// object that reports no errors. This, not the HTTP status alone.
+    /// object with a `$summary` object that reports no errors. This, not the HTTP status alone.
     pub fn committed(&self) -> bool {
         self.errors().is_empty()
     }
