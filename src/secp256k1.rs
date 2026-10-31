@@ -121,6 +121,9 @@ impl Secp256k1KeyPair {
     }
 
     /// Restores a signing key pair from stored key material.
+    ///
+    /// Errors with [`KeyError::Malformed`] when the private scalar does not
+    /// derive the public key.
     pub fn from_keys(public_key: &str, private_key: &str) -> Result<Self, KeyError> {
         let mut pair = Self::from_public(public_key)?;
 
@@ -133,9 +136,16 @@ impl Secp256k1KeyPair {
             });
         }
 
-        pair.signing = Some(
-            SigningKey::from_slice(&scalar).map_err(|_| KeyError::Malformed { role: "private" })?,
-        );
+        let signing =
+            SigningKey::from_slice(&scalar).map_err(|_| KeyError::Malformed { role: "private" })?;
+
+        // Compares curve points, so a compressed and an uncompressed public
+        // key for the same scalar both pass.
+        if signing.verifying_key() != &pair.verifying {
+            return Err(KeyError::Malformed { role: "private" });
+        }
+
+        pair.signing = Some(signing);
         Ok(pair)
     }
 
