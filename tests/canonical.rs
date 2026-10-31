@@ -195,3 +195,14 @@ fn large_integers_keep_their_precision() {
     let built = Object::new().set("big", 9_007_199_254_740_993_i64);
     assert_eq!(r#"{"big":9007199254740993}"#, stringify(built));
 }
+
+/// JSON.stringify gives carriage return, backspace and form feed their short
+/// escapes rather than the \u form, so signing the long form would mismatch.
+/// Built rather than written as literals, for the reason given above.
+#[test]
+fn carriage_return_backspace_and_form_feed_use_short_escapes() {
+    let raw: String = ['\r', '\u{8}', '\u{c}'].iter().collect();
+    let expected = format!("{{\"s\":\"{b}r{b}b{b}f\"}}", b = '\\');
+
+    assert_eq!(expected, stringify(Object::new().set("s", raw)));
+}
