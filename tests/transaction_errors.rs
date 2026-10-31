@@ -127,3 +127,61 @@ fn builder_errors_report_what_is_missing() {
         no_input.unwrap_err().to_string()
     );
 }
+
+#[test]
+fn output_payloads_land_under_their_stream_in_dollar_o() {
+    let key = KeyPair::generate().unwrap();
+    let tx = Transaction::builder()
+        .namespace("n")
+        .contract("c")
+        .input("in", &key)
+        .output("plain")
+        .output_with("rich", Object::new().set("amount", 5))
+        .build()
+        .unwrap();
+
+    assert_eq!(
+        r#"{"$namespace":"n","$contract":"c","$i":{"in":{}},"$o":{"plain":{},"rich":{"amount":5}}}"#,
+        String::from_utf8(tx.signed_bytes().unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn body_is_the_tx_object_that_the_envelope_wraps() {
+    let key = KeyPair::generate().unwrap();
+    let tx = Transaction::builder()
+        .namespace("n")
+        .contract("c")
+        .entry("e")
+        .input("s", &key)
+        .build()
+        .unwrap();
+
+    let body = tx.body();
+    assert_eq!(
+        Some(&activeledger::Value::from("e")),
+        body.get("$entry"),
+        "{body:?}"
+    );
+    assert_eq!(
+        Some(&activeledger::Value::Object(body.clone())),
+        tx.envelope().get("$tx")
+    );
+}
+
+#[test]
+fn builder_debug_names_the_streams_but_never_the_signers() {
+    let key = KeyPair::generate().unwrap();
+    let builder = Transaction::builder()
+        .namespace("n")
+        .contract("c")
+        .input("in-stream", &key)
+        .output("out-stream")
+        .readonly("label", "ro-stream");
+
+    let shown = format!("{builder:?}");
+    assert!(shown.contains("in-stream"), "{shown}");
+    assert!(shown.contains("out-stream"), "{shown}");
+    assert!(shown.contains("label"), "{shown}");
+    assert!(!shown.contains(&key.public_key()), "{shown}");
+}
