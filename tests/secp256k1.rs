@@ -238,6 +238,24 @@ fn a_prefix_that_contradicts_the_length_is_rejected() {
     );
 }
 
+/// 04||X||Y with the right length and prefix but a point that is not on the
+/// curve must be refused, or a bad key verifies nothing and fails far away.
+#[test]
+fn an_uncompressed_point_off_the_curve_is_rejected() {
+    // x = 1, y = 1: 1 != 1 + 7 (mod p).
+    let off_curve = format!("0x04{:0>64}{:0>64}", "1", "1");
+    let error = Secp256k1KeyPair::from_public(&off_curve).unwrap_err();
+    assert!(matches!(error, KeyError::Malformed { .. }), "{error}");
+
+    // A real point with one bit of Y flipped is off the curve too.
+    let real = Secp256k1KeyPair::generate_with(false).public_key();
+    let mut bytes = hex::decode(&real[2..]).unwrap();
+    bytes[64] ^= 1;
+    let tampered = format!("0x{}", hex::encode(bytes));
+    let error = Secp256k1KeyPair::from_public(&tampered).unwrap_err();
+    assert!(matches!(error, KeyError::Malformed { .. }), "{error}");
+}
+
 #[test]
 fn non_hex_is_rejected() {
     let error = Secp256k1KeyPair::from_public("0xzzzz").unwrap_err();

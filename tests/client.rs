@@ -89,17 +89,57 @@ async fn non_string_errors_are_reported_as_json_text() {
     assert!(!response.committed());
 }
 
-/// Documented behaviour: a body that is not JSON carries no `$summary`, so it
-/// reads as committed. The caller has to check `raw()` when that matters.
+/// A body that is not a JSON object is not a ledger reply: a proxy page or a
+/// truncated body must not read as a commit. It is kept verbatim.
 #[tokio::test]
-async fn a_non_json_body_reads_as_committed_and_is_kept_verbatim() {
+async fn a_non_json_body_is_not_committed_and_is_kept_verbatim() {
     let response = submit("<html>502 Bad Gateway</html>").await;
 
-    assert!(response.committed());
-    assert!(response.errors().is_empty());
+    assert!(!response.committed());
+    assert_eq!(1, response.errors().len());
     assert!(response.new_streams().is_empty());
     assert!(response.responses().is_empty());
     assert_eq!("<html>502 Bad Gateway</html>", response.raw());
+}
+
+#[tokio::test]
+async fn valid_json_that_is_not_an_object_is_not_committed() {
+    for body in ["[]", "\"ok\"", "42", "null", "true"] {
+        let response = submit(body).await;
+        assert!(!response.committed(), "{body}");
+        assert_eq!(1, response.errors().len(), "{body}");
+        assert!(response.new_streams().is_empty(), "{body}");
+        assert!(response.responses().is_empty(), "{body}");
+    }
+}
+
+#[tokio::test]
+async fn an_error_page_under_a_failing_status_is_not_committed() {
+    for status in ["400 Bad Request", "404 Not Found", "502 Bad Gateway"] {
+        let (url, server) = serve(status, "text/html", "<html>proxy</html>");
+        let response = Client::new(url).submit_raw("{}").await.expect("reply");
+        server.join().expect("server");
+
+        assert!(!response.committed(), "{status}");
+        assert_eq!(status[..3].parse::<u16>().unwrap(), response.status());
+        assert!(response.errors()[0].contains(&status[..3]), "{status}");
+    }
+}
+
+/// A well-formed, error-free object under a failing status still is not a
+/// commit: the status says the node did not process it.
+#[tokio::test]
+async fn a_clean_json_object_under_a_failing_status_is_not_committed() {
+    let (url, server) = serve(
+        "503 Service Unavailable",
+        "application/json",
+        r#"{"$summary":{"errors":[],"commit":1}}"#,
+    );
+    let response = Client::new(url).submit_raw("{}").await.expect("reply");
+    server.join().expect("server");
+
+    assert!(!response.committed());
+    assert_eq!(vec!["HTTP status 503"], response.errors());
 }
 
 #[tokio::test]
@@ -107,7 +147,8 @@ async fn an_empty_body_does_not_panic() {
     let response = submit("").await;
 
     assert_eq!("", response.raw());
-    assert!(response.errors().is_empty());
+    assert!(!response.committed());
+    assert!(!response.errors().is_empty());
 }
 
 #[tokio::test]

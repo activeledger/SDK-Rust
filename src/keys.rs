@@ -58,6 +58,9 @@ pub const ML_DSA_65_PUBLIC_KEY_SIZE: usize = 1952;
 pub const ML_DSA_65_PRIVATE_KEY_SIZE: usize = 4032;
 pub const ML_DSA_65_SIGNATURE_SIZE: usize = 3309;
 
+/// Signed and verified by [`KeyPair::from_keys`] to prove the two halves match.
+const PAIR_CHECK_MESSAGE: &[u8] = b"activeledger key pair check";
+
 #[derive(Debug, thiserror::Error)]
 pub enum KeyError {
     #[error("unknown key type '{0}' - expected rsa, secp256k1, ml-dsa-65 or falcon-512")]
@@ -142,14 +145,16 @@ pub enum KeyError {
     #[error("a BIP-39 seed is 64 bytes, got {actual}")]
     WrongBip39SeedLength { actual: usize },
 
+    /// Not returned by anything in this SDK: there is no Falcon key type to
+    /// load, so no call reaches it. The variant stays only because removing it
+    /// would break callers that match on it.
+    ///
     /// Falcon-512 identities work on the ledger and are supported by the JS,
     /// JVM and C# SDKs. They are not supported here.
     ///
     /// No pure-Rust Falcon implementation reads the key encoding the ledger
     /// stores: `fn-dsa` cannot decode the ledger's keys at all, which was
-    /// established by trying it rather than by reading about it. Returning
-    /// this error is the honest outcome; silently producing a key the ledger
-    /// would reject as a bad signature is not.
+    /// established by trying it rather than by reading about it.
     #[error(
         "falcon-512 is not supported by the Rust SDK - no pure-Rust implementation reads \
          the ledger's key encoding. Use ml-dsa-65, or one of the JS, JVM or C# SDKs."
@@ -256,10 +261,23 @@ impl KeyPair {
             .clone()
             .try_into()
             .map_err(|_| KeyError::Malformed { role: "private" })?;
-        pair.private = Some(
-            ml_dsa_65::PrivateKey::try_from_bytes(array)
-                .map_err(|_| KeyError::Malformed { role: "private" })?,
-        );
+        let private = ml_dsa_65::PrivateKey::try_from_bytes(array)
+            .map_err(|_| KeyError::Malformed { role: "private" })?;
+
+        // fips204 accepts any buffer of the right length, so the decode above
+        // proves nothing. Sign a fixed message and check it against the
+        // supplied public key: that fails unless the two halves are a pair.
+        // (fips204's own private-to-public derivation is not used because it
+        // asserts, rather than errors, on an inconsistent secret key.)
+        let consistent = private
+            .try_sign(PAIR_CHECK_MESSAGE, &[])
+            .map(|signature| pair.public.verify(PAIR_CHECK_MESSAGE, &signature, &[]))
+            .unwrap_or(false);
+        if !consistent {
+            return Err(KeyError::Malformed { role: "private" });
+        }
+
+        pair.private = Some(private);
         pair.private_bytes = Some(private_bytes);
         Ok(pair)
     }

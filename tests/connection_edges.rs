@@ -137,6 +137,20 @@ async fn a_json_error_body_under_a_failing_status_is_still_reported_as_errors() 
 }
 
 #[tokio::test]
+async fn onboard_fails_on_a_failing_status_even_with_a_stream_id() {
+    let reply = r#"{"$summary":{"commit":1},"$streams":{"new":[{"id":"abc"}]}}"#;
+    let (url, server) = serve("502 Bad Gateway", "application/json", reply);
+
+    let error = Client::new(url)
+        .onboard(&KeyPair::generate().expect("keygen"))
+        .await
+        .unwrap_err();
+    server.join().expect("server");
+
+    assert!(matches!(error, ClientError::OnboardFailed(_)), "{error:?}");
+}
+
+#[tokio::test]
 async fn onboard_fails_when_the_reply_names_no_new_stream() {
     let reply = r#"{"$summary":{"commit":1},"$streams":{"new":[]}}"#;
     let (url, server) = serve("200 OK", "application/json", reply);
