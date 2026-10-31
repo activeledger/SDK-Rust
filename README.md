@@ -11,6 +11,8 @@
 
 # Activeledger SDK for Rust
 
+**Documentation:** [SDK guide](https://activeledger.github.io/activeledger/sdks/rust/) | [All SDKs](https://activeledger.github.io/activeledger/sdks/) | [Activeledger guide](https://activeledger.github.io/activeledger/)
+
 Build, sign and submit Activeledger transactions from Rust, with post-quantum
 identities.
 
